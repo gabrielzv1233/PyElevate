@@ -14,10 +14,13 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
+        "Operating System :: POSIX",
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: Unix",
     ],
     install_requires=[],
-    python_requires=">=3.6",
+    python_requires=">=3",
     entry_points={
         "console_scripts": [
             "pyelevate = PyElevate.__init__:main",
