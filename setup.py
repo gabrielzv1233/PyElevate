@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="PyElevate",
-    version="0.1.1",
+    version="0.1.2",
     author="Gabrielzv1233",
     author_email="gabrielzv1233@gmail.com",
     url="https://github.com/gabrielzv1233/PyElevate",
