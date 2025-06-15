@@ -1,8 +1,7 @@
-import ctypes
-from ctypes import POINTER, c_ulong, c_char_p, c_int, c_void_p
+from ctypes import POINTER, c_ulong, c_char_p, c_int, c_void_p, windll, Structure, sizeof, byref, WinError
 from ctypes.wintypes import HANDLE, BOOL, DWORD, HWND, HINSTANCE, HKEY
-from ctypes import windll
 import subprocess
+import traceback
 import sys
 
 # Constant defintions
@@ -14,11 +13,11 @@ SEE_MASK_NO_CONSOLE = 0x00008000
 
 # Type definitions
 
-PHANDLE = ctypes.POINTER(HANDLE)
-PDWORD = ctypes.POINTER(DWORD)
+PHANDLE = POINTER(HANDLE)
+PDWORD = POINTER(DWORD)
 
 
-class ShellExecuteInfo(ctypes.Structure):
+class ShellExecuteInfo(Structure):
     _fields_ = [
         ('cbSize',       DWORD),
         ('fMask',        c_ulong),
@@ -38,10 +37,9 @@ class ShellExecuteInfo(ctypes.Structure):
 
     def __init__(self, **kw):
         super(ShellExecuteInfo, self).__init__()
-        self.cbSize = ctypes.sizeof(self)
+        self.cbSize = sizeof(self)
         for field_name, field_value in kw.items():
             setattr(self, field_name, field_value)
-
 
 PShellExecuteInfo = POINTER(ShellExecuteInfo)
 
@@ -63,30 +61,40 @@ CloseHandle.restype = BOOL
 
 # At last, the actual implementation!
 
-def elevate(show_console=True, graphical=True):
-    if windll.shell32.IsUserAnAdmin():
-        return
+def elevate(show_console=True, graphical=True, allow_cancel=True, log=True):
+    try:
+        if windll.shell32.IsUserAnAdmin():
+            return
 
-    params = ShellExecuteInfo(
-        fMask=SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE,
-        hwnd=None,
-        lpVerb=b'runas',
-        lpFile=sys.executable.encode('cp1252'),
-        lpParameters=subprocess.list2cmdline(sys.argv).encode('cp1252'),
-        nShow=int(show_console))
+        params = ShellExecuteInfo(
+            fMask=SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE,
+            hwnd=None,
+            lpVerb=b'runas',
+            lpFile=sys.executable.encode('cp1252'),
+            lpParameters=subprocess.list2cmdline(sys.argv).encode('cp1252'),
+            nShow=int(show_console))
 
-    if not ShellExecuteEx(ctypes.byref(params)):
-        raise ctypes.WinError()
+        if not ShellExecuteEx(byref(params)):
+            raise WinError()
 
-    handle = params.hProcess
-    ret = DWORD()
-    WaitForSingleObject(handle, -1)
+        handle = params.hProcess
+        ret = DWORD()
+        WaitForSingleObject(handle, -1)
 
-    if windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(ret)) == 0:
-        raise ctypes.WinError()
+        if windll.kernel32.GetExitCodeProcess(handle, byref(ret)) == 0:
+            raise WinError()
 
-    CloseHandle(handle)
-    sys.exit(ret.value)
+        CloseHandle(handle)
+        sys.exit(ret.value)
+    except OSError as e:
+        if e.winerror == 1223:
+            if log: print("Elevation cancelled by user.")
+            if allow_cancel:
+                return False
+            else:
+                sys.exit(e.winerror)
+        else:
+            traceback.print_exc()
 
 def is_admin():
     return bool(windll.shell32.IsUserAnAdmin())
